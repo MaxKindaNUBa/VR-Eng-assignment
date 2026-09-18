@@ -4,85 +4,84 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{xcolor}
-\usepackage{fancyhdr}
 \usepackage{hyperref}
-\usepackage{listings}
 \usepackage{enumitem}
 \usepackage{microtype}
+\usepackage{parskip}
 
-\definecolor{headerblue}{RGB}{20,60,110}
-\definecolor{codebg}{RGB}{245,245,245}
-
-\lstset{
-  backgroundcolor=\color{codebg},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  columns=fullflexible,
-  frame=single,
-  language=Java
-}
-
-\pagestyle{fancy}
-\fancyhf{}
-\renewcommand{\headrulewidth}{0.6pt}
-\fancyhead[L]{\small AM5011 / Virtual Reality Engineering / Assignment 2}
-\fancyfoot[C]{\small\thepage}
-
-\title{\vspace{-1.5cm}\textcolor{headerblue}{\Large\textbf{AM5011 Virtual Reality Engineering}}\\[4pt]
-\textcolor{headerblue}{\large Assignment 2: Dual Quaternions for VR Poses and Blending}}
-\author{Your Name \quad | \quad Roll Number: XXXXXXX \quad | \quad Unity Version: 2022.3.52f1}
-\date{}
+\title{Dual Quaternions for VR Poses and Blending}
+\author{Your Name\\
+Roll Number: XXXXXXX\\
+AM5011 --- Virtual Reality Engineering, Assignment 2}
+\date{Unity 2022.3.52f1 \\ \today}
 
 \begin{document}
+
 \maketitle
-\thispagestyle{fancy}
-\vspace{-1cm}
 
-% =========================================================================
-\section*{Part A --- Math and Representation}
+\begin{abstract}
+This report derives the unit dual quaternion representation of a rigid 6-DOF
+pose, implements it as a reusable Unity C\# component, and uses it to compare
+dual-quaternion pose blending against decoupled position/rotation
+interpolation. The dual-quaternion blend is shown, both analytically and
+through a numerical experiment, to follow a coupled screw-motion path rather
+than the straight chord produced by interpolating position and rotation
+independently.
+\end{abstract}
 
-\subsection*{1. Constructing the unit dual quaternion}
+\section{Introduction}
 
-Let $q_r$ be a unit rotation quaternion ($\lVert q_r\rVert = 1$) and let
-$t = (t_x, t_y, t_z)$ be a translation vector, embedded as the pure
-quaternion $T = (t_x, t_y, t_z, 0)$.
+Rigid-body poses in VR --- controller transforms, tracked limbs, networked
+avatar updates --- are usually represented as a rotation and a translation
+kept in separate variables. Interpolating the two independently is simple but
+physically inconsistent: it does not correspond to any single rigid motion of
+the object between the two poses. A \emph{unit dual quaternion} instead
+encodes rotation and translation as one coupled algebraic object, so that
+interpolating it produces a genuine rigid motion at every step. This report
+covers three things: the derivation of the dual quaternion pose
+representation and its inverse (Section~\ref{sec:math}), a Unity C\#
+implementation of it (Section~\ref{sec:implementation}), and a small
+experiment comparing it against decoupled interpolation
+(Section~\ref{sec:experiment}).
 
-A pure rotation has zero dual part:
-\[
-\hat{R} = q_r + \epsilon \cdot 0.
-\]
-A pure translation is represented as
-\[
-\hat{T} = 1 + \tfrac{1}{2}\epsilon T.
-\]
-Applying the rotation first and the translation second corresponds to
-$\hat{q} = \hat{T}\hat{R}$:
+\section{Mathematical Formulation}
+\label{sec:math}
+
+\subsection{Constructing the unit dual quaternion}
+
+Let $q_r$ be a unit rotation quaternion ($\lVert q_r \rVert = 1$) and let
+$t = (t_x, t_y, t_z)$ be a translation vector, embedded as the pure quaternion
+$T = (t_x, t_y, t_z, 0)$. A dual quaternion is written $\hat q = q_r + \epsilon
+q_d$ with $\epsilon^2 = 0$.
+
+A pure rotation has zero dual part, $\hat R = q_r + \epsilon \cdot 0$, and a
+pure translation is written $\hat T = 1 + \tfrac{1}{2}\epsilon T$. Applying the
+rotation first and the translation second gives the composite pose
+$\hat q = \hat T \hat R$:
 \[
 \hat{q} = \left(1 + \tfrac{1}{2}\epsilon T\right)(q_r + 0\cdot\epsilon)
         = q_r + \epsilon\left(\tfrac{1}{2} T q_r\right).
 \]
 
-\begin{quote}
-\textbf{Derived unit dual quaternion:}
-\[
+This gives the pose representation used throughout the rest of the report:
+\begin{equation}
 \hat{q} = q_r + \epsilon q_d, \qquad q_d = \tfrac{1}{2} T q_r.
-\]
-\end{quote}
+\label{eq:pose}
+\end{equation}
+Since $\lVert q_r \rVert = 1$ and $q_r \cdot q_d = \operatorname{Re}(q_d q_r^{*})
+= \operatorname{Re}(\tfrac12 T) = 0$, $\hat q$ satisfies both constraints of a
+unit dual quaternion and validly encodes the 6-DOF pose $(R, t)$.
 
-Since $\lVert q_r \rVert = 1$ and $q_r \cdot q_d = \operatorname{Re}(q_d q_r^{*}) =
-\operatorname{Re}(\tfrac12 T) = 0$, $\hat{q}$ satisfies both unit dual
-quaternion constraints and validly encodes the 6-DOF pose $(R, t)$.
+\subsection{Recovering rotation and translation}
 
-\subsection*{2. Recovering $R$ and $t$ from $\hat{q}$}
-
-The real part directly gives the rotation, renormalized to remove drift:
+The real part directly gives the rotation, renormalized to remove
+floating-point drift:
 \[
 R = \frac{q_r}{\lVert q_r \rVert}.
 \]
-
-To recover the translation, start from $q_d = \tfrac12 T q_r$ and
-right-multiply by $q_r^{-1}$. Since $q_r$ is unit, $q_r^{-1} = q_r^{*}$:
+To recover the translation, start from $q_d = \tfrac12 T q_r$ in
+Equation~\eqref{eq:pose} and right-multiply by $q_r^{-1}$. Since $q_r$ is
+unit, $q_r^{-1} = q_r^{*}$, so
 \[
 2 q_d q_r^{*} = T (q_r q_r^{*}) = T
 \qquad\Longrightarrow\qquad
@@ -92,97 +91,104 @@ The vector part of the resulting pure quaternion $T$ is the recovered
 translation $t = (T_x, T_y, T_z)$; its scalar component is zero up to
 floating-point error.
 
-\subsection*{3. Why dual quaternions for VR blending?}
+\subsection{Composition}
 
-Natural VR motions --- a controller swinging through an arc, a shoulder-elbow-wrist
-chain articulating --- combine rotation and translation along a single curved
-path, not two independent straight-line channels. Blending position and
-rotation separately (\texttt{Vector3.Lerp} + \texttt{Quaternion.Slerp}) forces
-the object along a flat chord between the two endpoints while the orientation
-turns independently, which is exactly the decoupling that produces
-"candy-wrapper" mesh collapse in skinning and visibly unnatural sliding motion
-for a single rigid object. A dual quaternion blends translation and rotation
-as one coupled 6-DOF quantity, so the interpolated pose follows the true
-spatial screw motion between the two poses (Chasles' theorem) instead of an
-arbitrary decoupled path.
-
-\subsection*{Composition (used by \texttt{DualQuaternion.Multiply})}
-
+Two poses compose as
 \[
-\hat{q}_a \hat{q}_b = (q_{r,a} q_{r,b}) + \epsilon (q_{r,a} q_{d,b} + q_{d,a} q_{r,b}).
+\hat{q}_a \hat{q}_b = (q_{r,a} q_{r,b}) + \epsilon (q_{r,a} q_{d,b} + q_{d,a} q_{r,b}),
 \]
-\texttt{Multiply(a, b)} applies $b$ first, then $a$: $R = R_a R_b$ and
-$t = R_a t_b + t_a$, matching Unity's own quaternion/transform composition
-order.
+which applies $b$ first, then $a$: $R = R_a R_b$ and $t = R_a t_b + t_a$,
+matching Unity's own quaternion/transform composition order.
 
-% =========================================================================
-\section*{Part B --- Implementation (Unity C\#)}
+\subsection{Why dual quaternions for VR blending}
 
-\texttt{Assets/Scripts/DualQuaternion.cs} implements the struct exactly as
-specified:
+Natural VR motions --- a controller swinging through an arc, a shoulder,
+elbow and wrist chain articulating together --- combine rotation and
+translation along a single curved path rather than two independent
+straight-line channels. Blending position and rotation separately
+(\texttt{Vector3.Lerp} together with \texttt{Quaternion.Slerp}) forces the
+object along a flat chord between the two endpoints while the orientation
+turns independently of it, which is the same decoupling responsible for
+``candy-wrapper'' mesh collapse in skinning and for visibly unnatural sliding
+motion on a single rigid object. A dual quaternion blends translation and
+rotation as one coupled quantity, so the interpolated pose instead follows
+the true spatial screw motion between the two poses (Chasles' theorem).
+
+\section{Implementation}
+\label{sec:implementation}
+
+The representation above was implemented in Unity C\# as a
+\texttt{DualQuaternion} struct with two \texttt{Quaternion} fields, \texttt{r}
+(real part) and \texttt{d} (dual part), and the following methods:
 
 \begin{itemize}
-  \item \textbf{Fields:} \texttt{Quaternion r} (real part), \texttt{Quaternion d} (dual part).
-  \item \texttt{FromPose(rotation, translation)} --- builds $\hat q = q_r + \epsilon(\tfrac12 T q_r)$.
-  \item \texttt{ToPose(out rotation, out translation)} --- extracts $R = q_r/\lVert q_r\rVert$ and $t = 2 q_d q_r^{*}$.
-  \item \texttt{Multiply(a, b)} --- rigid composition as derived above.
-  \item \texttt{Slerp(a, b, u)} --- dual quaternion linear blending (DLB): shortest-path
-    sign alignment on the real part, \texttt{Quaternion.Slerp} on $q_r$, a
-    \emph{componentwise} \texttt{Mathf.Lerp} on $q_d$, then re-normalization.
-  \item \texttt{Normalized()} / \texttt{Conjugate()} --- enforce $\lVert q_r\rVert = 1$,
-    $q_r \cdot q_d = 0$, and provide the dual quaternion conjugate.
+\raggedright
+  \item \texttt{FromPose(rotation, translation)} builds
+    $\hat q = q_r + \epsilon(\tfrac12 T q_r)$, Equation~\eqref{eq:pose}.
+  \item \texttt{ToPose(out rotation, out translation)} extracts
+    $R = q_r/\lVert q_r\rVert$ and $t = 2 q_d q_r^{*}$.
+  \item \texttt{Multiply(a, b)} performs the rigid composition derived above.
+  \item \texttt{Slerp(a, b, u)} blends two poses: shortest-path sign
+    alignment on the real part, \texttt{Quaternion.Slerp} on $q_r$, a
+    componentwise \texttt{Mathf.Lerp} on $q_d$, then re-normalization. This is
+    dual quaternion linear blending (DLB), an approximation to true
+    constant-speed screw interpolation (ScLERP) that is standard practice for
+    this kind of assignment.
+  \item \texttt{Normalized()} and \texttt{Conjugate()} enforce
+    $\lVert q_r\rVert = 1$ and $q_r \cdot q_d = 0$, and provide the dual
+    quaternion conjugate used internally.
 \end{itemize}
 
-\paragraph{Two implementation details that matter.} Unity's \texttt{Quaternion}
-type has no operators for quaternion addition or scalar multiplication between
-two quaternions, so every dual-part operation is written out componentwise
-rather than relying on \texttt{Quaternion} arithmetic. Second, the dual part of
-the identity pose is the \emph{zero} quaternion $(0,0,0,0)$, not
-\texttt{Quaternion.identity} (which is $(0,0,0,1)$) --- using the latter would
-silently encode a phantom translation. Likewise, \texttt{Slerp} blends the dual
-part with \texttt{Mathf.Lerp} component-by-component rather than
+Two details were easy to get wrong and are worth recording. First, Unity's
+\texttt{Quaternion} type has no operator for addition or for scalar
+multiplication between two quaternions, so every dual-part operation had to
+be written out componentwise rather than through \texttt{Quaternion}
+arithmetic. Second, the dual part of the identity pose is the \emph{zero}
+quaternion $(0,0,0,0)$, not \texttt{Quaternion.identity} (which is
+$(0,0,0,1)$); using the latter would silently encode a phantom translation.
+For the same reason, \texttt{Slerp} blends the dual part with
+\texttt{Mathf.Lerp} component-by-component rather than
 \texttt{Quaternion.Lerp}, which renormalizes its result to a unit quaternion
-and would corrupt the (generally non-unit) dual part.
+and would corrupt the generally non-unit dual part.
 
-\subsection*{Demo scene}
+\subsection{Demo scene}
 
-\texttt{Assets/Scripts/Editor/SceneSetupHelper.cs} adds an editor menu item,
-\textbf{AM5011 $\to$ Build Full Demo Scene}, that constructs the scene
-programmatically (since a hand-authored \texttt{.unity} file cannot be
-produced outside the Unity Editor reliably):
+An editor script adds the menu command \textbf{AM5011 $\to$ Build Full Demo
+Scene}, which constructs the scene programmatically: a fixed \texttt{PoseA}
+and \texttt{PoseB} anchor, an \texttt{InterpolatedPose} object driven by
+\texttt{DualQuaternion.Slerp}, a \texttt{DecoupledPose} object driven by plain
+\texttt{Vector3.Lerp} and \texttt{Quaternion.Slerp} for comparison, a UI
+slider bound to the interpolation parameter $u$, and a \texttt{TrailRenderer}
+on each moving object to visualize the swept path.
 
-\begin{itemize}
-  \item \texttt{PoseA} (red) and \texttt{PoseB} (green) as fixed pose anchors.
-  \item \texttt{InterpolatedPose} (cyan), driven by\\
-    \texttt{DualQuaternionPoseDemo.cs} using \texttt{DualQuaternion.Slerp}.
-  \item \texttt{DecoupledPose} (magenta), driven by plain \texttt{Vector3.Lerp}
-    and \texttt{Quaternion.Slerp} for the Part C comparison.
-  \item A UI \texttt{Slider} (0--1) bound to the interpolation parameter $u$, plus
-    a \texttt{TrailRenderer} on each pointer to visualize the swept path.
-\end{itemize}
+A separate Play-mode test component checks that \texttt{FromPose}/
+\texttt{ToPose} round-trips correctly, that \texttt{Slerp} exactly recovers
+both endpoints at $u=0,1$, that the blended pose remains a valid unit dual
+quaternion at $u=0.5$, and that \texttt{Multiply} composes two poses the same
+way Unity's own transform chaining does.
 
-\texttt{Assets/Scripts/DualQuaternionMathTests.cs} is a Play-mode sanity check:
-it verifies the \texttt{FromPose}/\texttt{ToPose} roundtrip, that
-\texttt{Slerp} exactly recovers both endpoints at $u=0,1$, that the blended
-pose stays a valid unit dual quaternion at $u=0.5$, and that \texttt{Multiply}
-composes two poses the same way Unity's own transform chaining does.
+\section{Experimental Evaluation}
+\label{sec:experiment}
 
-% =========================================================================
-\section*{Part C --- Mini-Experiment: Controller Interpolation}
+\subsection{Setup}
 
-\textbf{Setup.} PoseA is placed at $(-2, 0, 0)$~m with identity rotation;
-PoseB is placed at $(2, 0, 0)$~m rotated $120^\circ$ about $+Z$. Both methods
-interpolate between the identical pair of endpoints:
-\begin{enumerate}[nosep]
-  \item \textbf{Separate:} \texttt{Vector3.Lerp} on position, \texttt{Quaternion.Slerp} on rotation.
-  \item \textbf{Dual-quaternion Slerp (DLB):} \texttt{DualQuaternion.Slerp(dqA, dqB, u)}.
-\end{enumerate}
+To isolate the effect of coupling, \texttt{PoseA} was placed at
+$(-2, 0, 0)$~m with identity rotation and \texttt{PoseB} at $(2, 0, 0)$~m
+rotated $120^\circ$ about $+Z$. Both interpolation methods were evaluated on
+this identical pair of endpoints: (1) \emph{separate} interpolation
+(\texttt{Vector3.Lerp} on position, \texttt{Quaternion.Slerp} on rotation),
+and (2) \emph{dual-quaternion} interpolation
+(\texttt{DualQuaternion.Slerp(dqA, dqB, u)}). The underlying math was
+re-implemented independently in Python to sample both paths at 101 values of
+$u \in [0,1]$ and generate Figure~\ref{fig:trajectory} and
+Table~\ref{tab:results}.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.72\textwidth]{figures/trajectory_comparison.png}
-  \caption{Computed position path for both methods, sampled at 101 values of $u \in [0,1]$
-  (\texttt{tools/dualquat\_sim.py}, a numeric replica of \texttt{DualQuaternion.cs}).}
+  \includegraphics[width=0.7\textwidth]{figures/trajectory_comparison.png}
+  \caption{Position path of the two interpolation methods between the same
+  pair of endpoints.}
+  \label{fig:trajectory}
 \end{figure}
 
 \begin{table}[h]
@@ -198,47 +204,70 @@ $u$ & DLB $x$ (m) & DLB $y$ (m) & DLB angle & Separate angle \\
 1.00 & $2.000$  & $0.000$  & $120.00^\circ$ & $120.00^\circ$ \\
 \bottomrule
 \end{tabular}
-\caption{Position and orientation at five sample values of $u$.}
+\caption{Position and orientation of both methods at five sample values of $u$.}
+\label{tab:results}
 \end{table}
 
-\subsection*{Observations}
+\subsection{Observations}
 
 \begin{itemize}
 \raggedright
-  \item \textbf{Curved vs.\ straight path:} the separate method's position
-    follows the straight chord $y=0$ between the anchors; DLB's position
-    follows a curved arc dipping to $y = -1.0$~m at $u=0.5$. Coupling rotation
-    into the translation term ($q_d = \tfrac12 T q_r$) is exactly what bends
-    the path.
-  \item \textbf{Orientation profile is identical here:} both methods compute
-    the rotation as \texttt{Quaternion.Slerp} of the same endpoint
-    quaternions, so the angle-vs-$u$ curve matches exactly in this
-    experiment. The two methods diverge only in \emph{where the translation
-    goes}, not in the rotation timing --- for a genuine screw motion (dual
-    quaternion) this coupling is precisely what decoupled Lerp + Slerp
-    cannot express.
-  \item \textbf{Naturalness for VR:} the curved DLB path is consistent with a
+  \item \textbf{Curved vs.\ straight path.} The separate method's position
+    follows the straight chord $y=0$ between the anchors, while the
+    dual-quaternion blend follows a curved arc dipping to $y=-1.0$~m at
+    $u=0.5$. Coupling rotation into the translation term
+    ($q_d = \tfrac12 T q_r$) is what bends the path.
+  \item \textbf{Orientation timing is unaffected here.} Both methods compute
+    rotation as \texttt{Quaternion.Slerp} of the same endpoint quaternions,
+    so the angle-versus-$u$ curve matches exactly in this experiment; the two
+    methods diverge only in where the translation goes, not in rotation
+    timing. For a genuine screw motion, this position/rotation coupling is
+    exactly what decoupled interpolation cannot express.
+  \item \textbf{Naturalness for VR.} The curved path is consistent with a
     joint (shoulder, elbow, wrist) sweeping a controller through an arc; the
-    straight-chord path of separate interpolation looks mechanical and
-    unnatural for a rotating hand or tool, since it is only correct when
-    translation and rotation are physically independent.
-  \item \textbf{Rigidity is preserved either way:} because \texttt{Normalized()}
-    is applied after every blend, DLB stays on the unit dual-quaternion
-    manifold throughout $u \in [0,1]$; there is no collapse or scale drift at
-    the midpoint.
-  \item \textbf{Caveat:} this simple DLB (linear blend + re-normalize) is an
-    approximation to true constant-speed ScLERP; for large rotation angles or
-    widely separated anchors the coupling is even more pronounced, which is
-    the effect exploited for avatar-skinning artifact reduction (Kavan et al., 2008).
+    straight-chord path looks mechanical and unnatural for a rotating hand or
+    tool, since it is only correct when translation and rotation happen to be
+    physically independent.
+  \item \textbf{Rigidity is preserved either way.} Because
+    \texttt{Normalized()} is applied after every blend, the dual-quaternion
+    interpolation stays on the unit dual-quaternion manifold throughout
+    $u \in [0,1]$, with no collapse or scale drift at the midpoint.
+  \item \textbf{Caveat.} This simple DLB (linear blend followed by
+    re-normalization) approximates true constant-speed ScLERP; for larger
+    rotation angles or more widely separated anchors the coupling becomes
+    even more pronounced, which is the same effect exploited to reduce
+    skinning artifacts in avatar deformation \cite{kavan2008}.
 \end{itemize}
 
-% =========================================================================
-\section*{Deliverables}
+\section{Conclusion}
+
+Representing a 6-DOF pose as a unit dual quaternion couples rotation and
+translation into a single interpolable object. The derivation in
+Section~\ref{sec:math} shows this representation is exact and invertible; the
+implementation in Section~\ref{sec:implementation} shows it fits cleanly into
+Unity's existing \texttt{Quaternion}/\texttt{Vector3} API once the
+componentwise dual-part arithmetic is handled correctly; and the experiment
+in Section~\ref{sec:experiment} shows the practical consequence of that
+coupling: a curved, physically coherent motion path in place of the straight
+chord produced by interpolating position and rotation separately. This is the
+property that makes dual quaternions useful for VR controller smoothing,
+avatar skinning, and networked pose updates.
+
+\begin{thebibliography}{9}
+\bibitem{kavan2008}
+L.~Kavan, S.~Collins, J.~\v{Z}\'ara, C.~O'Sullivan,
+``Geometric Skinning with Approximate Dual Quaternion Blending,''
+\emph{ACM Transactions on Graphics}, 27(4), 2008.
+\end{thebibliography}
+
+\appendix
+\section*{Appendix: Code and Data Listing}
 \begin{itemize}[nosep]
 \raggedright
   \item \path{Assets/Scripts/DualQuaternion.cs}, \path{DualQuaternionPoseDemo.cs},
-    \path{Editor/SceneSetupHelper.cs}, \path{DualQuaternionMathTests.cs}.
-  \item \path{tools/dualquat_sim.py} --- numeric verification and Part C figure and table generator.
+    \path{Editor/SceneSetupHelper.cs}, \path{DualQuaternionMathTests.cs} --- Unity implementation.
+  \item \path{tools/dualquat_sim.py} --- independent numeric check and generator for
+    Figure~\ref{fig:trajectory} and Table~\ref{tab:results}.
   \item This report (\path{report/main.tex}).
 \end{itemize}
 
