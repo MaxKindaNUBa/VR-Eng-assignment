@@ -9,6 +9,7 @@
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{enumitem}
+\usepackage{microtype}
 
 \definecolor{headerblue}{RGB}{20,60,110}
 \definecolor{codebg}{RGB}{245,245,245}
@@ -152,10 +153,10 @@ produced outside the Unity Editor reliably):
 
 \begin{itemize}
   \item \texttt{PoseA} (red) and \texttt{PoseB} (green) as fixed pose anchors.
-  \item \texttt{InterpolatedPose} (cyan), driven by \texttt{DualQuaternionPoseDemo.cs}
-    using \texttt{DualQuaternion.Slerp}.
-  \item \texttt{DecoupledPose} (magenta), driven by plain \texttt{Vector3.Lerp} +
-    \texttt{Quaternion.Slerp} for the Part C comparison.
+  \item \texttt{InterpolatedPose} (cyan), driven by\\
+    \texttt{DualQuaternionPoseDemo.cs} using \texttt{DualQuaternion.Slerp}.
+  \item \texttt{DecoupledPose} (magenta), driven by plain \texttt{Vector3.Lerp}
+    and \texttt{Quaternion.Slerp} for the Part C comparison.
   \item A UI \texttt{Slider} (0--1) bound to the interpolation parameter $u$, plus
     a \texttt{TrailRenderer} on each pointer to visualize the swept path.
 \end{itemize}
@@ -203,6 +204,7 @@ $u$ & DLB $x$ (m) & DLB $y$ (m) & DLB angle & Separate angle \\
 \subsection*{Observations}
 
 \begin{itemize}
+\raggedright
   \item \textbf{Curved vs.\ straight path:} the separate method's position
     follows the straight chord $y=0$ between the anchors; DLB's position
     follows a curved arc dipping to $y = -1.0$~m at $u=0.5$. Coupling rotation
@@ -213,13 +215,13 @@ $u$ & DLB $x$ (m) & DLB $y$ (m) & DLB angle & Separate angle \\
     quaternions, so the angle-vs-$u$ curve matches exactly in this
     experiment. The two methods diverge only in \emph{where the translation
     goes}, not in the rotation timing --- for a genuine screw motion (dual
-    quaternion) this coupling is precisely what a decoupled Lerp+Slerp
+    quaternion) this coupling is precisely what decoupled Lerp + Slerp
     cannot express.
   \item \textbf{Naturalness for VR:} the curved DLB path is consistent with a
-    joint (shoulder/elbow/wrist) sweeping a controller through an arc; the
-    straight-chord path of separate interpolation looks mechanical/unnatural
-    for a rotating hand or tool, since it is only correct when translation
-    and rotation are physically independent.
+    joint (shoulder, elbow, wrist) sweeping a controller through an arc; the
+    straight-chord path of separate interpolation looks mechanical and
+    unnatural for a rotating hand or tool, since it is only correct when
+    translation and rotation are physically independent.
   \item \textbf{Rigidity is preserved either way:} because \texttt{Normalized()}
     is applied after every blend, DLB stays on the unit dual-quaternion
     manifold throughout $u \in [0,1]$; there is no collapse or scale drift at
@@ -233,10 +235,11 @@ $u$ & DLB $x$ (m) & DLB $y$ (m) & DLB angle & Separate angle \\
 % =========================================================================
 \section*{Deliverables}
 \begin{itemize}[nosep]
-  \item \texttt{Assets/Scripts/DualQuaternion.cs}, \texttt{DualQuaternionPoseDemo.cs},
-    \texttt{Editor/SceneSetupHelper.cs}, \texttt{DualQuaternionMathTests.cs}.
-  \item \texttt{tools/dualquat\_sim.py} --- numeric verification and Part C figure/table generator.
-  \item This report (\texttt{report/main.tex}).
+\raggedright
+  \item \path{Assets/Scripts/DualQuaternion.cs}, \path{DualQuaternionPoseDemo.cs},
+    \path{Editor/SceneSetupHelper.cs}, \path{DualQuaternionMathTests.cs}.
+  \item \path{tools/dualquat_sim.py} --- numeric verification and Part C figure and table generator.
+  \item This report (\path{report/main.tex}).
 \end{itemize}
 
 \end{document}
