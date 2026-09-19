@@ -1,5 +1,7 @@
 # AM5011 — Assignment 2: Dual Quaternions for VR Poses and Blending
 
+GitHub repository: https://github.com/MaxKindaNUBa/VR-Eng-assignment
+
 ## Contents
 
 ```
@@ -13,9 +15,11 @@ VR Eng assignment/
 │   └── Scenes/                          # (created by the scene builder, see below)
 ├── Packages/manifest.json               # Unity 2022.3 LTS package set
 ├── ProjectSettings/ProjectVersion.txt    # Pinned to 2022.3.52f1
+├── requirements.txt                      # Python deps for tools/dualquat_sim.py
 ├── tools/dualquat_sim.py                 # Numeric replica of the math, for Part C figure/table
-├── report/main.tex                       # Part A/B/C write-up (LaTeX)
-└── report/figures/trajectory_comparison.png
+├── report/main.tex                       # Report write-up (LaTeX)
+├── report/main.pdf                       # Compiled report
+└── report/figures/                       # trajectory_comparison.png, image.png
 ```
 
 ## Running the Unity project (2022.3.52f1)
@@ -43,11 +47,19 @@ VR Eng assignment/
 `tools/dualquat_sim.py` is a line-for-line numeric replica of
 `DualQuaternion.cs`'s math (not a Unity script) — it exists purely to compute
 exact numbers and the trajectory plot used in the report without needing a
-full Editor run. It uses `numpy` + `matplotlib`:
+full Editor run.
+
+Python dependencies are listed in `requirements.txt` (`numpy`, `matplotlib`).
+Install them with:
 
 ```bash
-# from the "VR Eng assignment" folder, using the conda env that has numpy/matplotlib:
-"C:\Users\first\.conda\envs\mainenv\python.exe" tools/dualquat_sim.py
+pip install -r requirements.txt
+```
+
+then run the script from the `VR Eng assignment` folder:
+
+```bash
+python tools/dualquat_sim.py
 ```
 
 This prints the $u$/position/angle table and (re)writes
@@ -55,16 +67,13 @@ This prints the $u$/position/angle table and (re)writes
 
 ## Building the report
 
-`report/main.tex` is a self-contained LaTeX file (needs only `amsmath`,
-`graphicx`, `booktabs`, `xcolor`, `fancyhdr`, `hyperref`, `listings`,
-`enumitem` — all part of a standard TeX distribution). No local LaTeX
-installation was found on this machine, so it hasn't been compiled here.
-Compile it with either:
+`report/main.tex` compiles with any standard TeX distribution (MiKTeX, TeX
+Live, or a self-contained engine like Tectonic) using only common packages —
+`amsmath`, `graphicx`, `booktabs`, `hyperref`, `enumitem`, `microtype`,
+`parskip`, `float`. A compiled copy is already checked in at
+`report/main.pdf`; to rebuild it after editing `main.tex`:
 
 - **Overleaf:** upload the `report/` folder (including `figures/`) as a new
   project and compile `main.tex`, or
 - **Local install:** install MiKTeX or TeX Live, then run
-  `pdflatex main.tex` from inside `report/`.
-
-Before submitting, fill in your actual name and roll number in the
-`\author{...}` line at the top of `main.tex`.
+  `pdflatex main.tex` (or `tectonic main.tex`) from inside `report/`.
