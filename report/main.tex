@@ -8,6 +8,7 @@
 \usepackage{enumitem}
 \usepackage{microtype}
 \usepackage{parskip}
+\usepackage{float}
 
 \title{Dual Quaternions for VR Poses and Blending}
 \author{K.Chandran\\
@@ -183,12 +184,23 @@ re-implemented independently in Python to sample both paths at 101 values of
 $u \in [0,1]$ and generate Figure~\ref{fig:trajectory} and
 Table~\ref{tab:results}.
 
-\begin{figure}[h]
+\begin{figure}[H]
   \centering
   \includegraphics[width=0.7\textwidth]{figures/trajectory_comparison.png}
   \caption{Position path of the two interpolation methods between the same
   pair of endpoints.}
   \label{fig:trajectory}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.55\textwidth]{figures/image.png}
+  \caption{Unity demo scene: \texttt{PoseA} (red) and \texttt{PoseB} (green)
+  anchors with the swept trails of \texttt{InterpolatedPose} (cyan, dual
+  quaternion) and \texttt{DecoupledPose} (magenta, separate Lerp+Slerp), the
+  same curved-versus-straight distinction as Figure~\ref{fig:trajectory}
+  reproduced live in the Editor.}
+  \label{fig:unity-demo}
 \end{figure}
 
 \begin{table}[h]
