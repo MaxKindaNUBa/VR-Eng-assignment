@@ -2,6 +2,15 @@
 
 GitHub repository: https://github.com/MaxKindaNUBa/VR-Eng-assignment
 
+## Demo
+
+![Unity demo scene: dual-quaternion (cyan) vs. decoupled Lerp+Slerp (magenta) trails](report/figures/image.png)
+
+`PoseA` (red) and `PoseB` (green) anchors with the swept trails of
+`InterpolatedPose` (cyan, dual quaternion) and `DecoupledPose` (magenta,
+separate Lerp+Slerp) — the curved-vs-straight comparison from Part C,
+captured live in the Editor.
+
 ## Contents
 
 ```
